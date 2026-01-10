@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Forage Command | Bale Counts</title>
+    <meta name="theme-color" content="#000000">
+    <style>
+        :root { 
+            --neon: #39ff14; 
+            --amber: #ffcc00; 
+            --blue: #00d4ff; 
+            --bg: #050505; 
+            --card: #111; 
+            --border: #333;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-tap-highlight-color: transparent; }
+        
+        body { background: var(--bg); color: #fff; margin: 0; padding: 0; padding-bottom: 90px; }
+        
+        /* HEADER */
+        .header { background: #000; border-bottom: 2px solid var(--neon); padding: 15px; text-align: center; position: sticky; top: 0; z-index: 100; box-shadow: 0 4px 15px rgba(0,0,0,0.9); }
+        .header h1 { margin: 0; font-size: 1.1rem; letter-spacing: 2px; color: var(--neon); text-transform: uppercase; font-weight: 900; }
+        
+        /* CONTAINERS */
+        .container { padding: 10px; max-width: 600px; margin: auto; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .section-title { color: var(--amber); font-size: 0.75rem; font-weight: bold; text-transform: uppercase; margin-bottom: 12px; letter-spacing: 1px; }
+
+        /* INPUTS */
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+        label { display: block; font-size: 0.7rem; color: #888; margin-bottom: 5px; font-weight: bold; text-transform: uppercase; }
+        input[type="number"], input[type="text"] { 
+            width: 100%; background: #1a1a1a; border: 1px solid #444; color: white; padding: 14px; border-radius: 8px; font-size: 1.2rem; outline: none; transition: 0.2s; -moz-appearance: textfield; font-weight: bold;
+        }
+        input:focus { border-color: var(--neon); background: #000; }
+
+        /* TOGGLES */
+        .mode-toggle { display: flex; background: #222; border-radius: 6px; padding: 4px; border: 1px solid #444; margin-top: 5px; }
+        .m-btn { flex: 1; padding: 12px; border: none; background: none; color: #666; font-weight: bold; font-size: 0.9rem; border-radius: 4px; }
+        .m-btn.active { background: var(--neon); color: black; }
+        .m-btn.sep-active { background: var(--amber); color: black; }
+
+        /* FEED CARD (TRUCK MODE) */
+        .truck-card { border: 2px solid #333; padding: 0; overflow: hidden; background: #000; }
+        .truck-head { background: #111; padding: 15px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; }
+        .truck-title { font-size: 1.4rem; font-weight: 900; color: #fff; text-transform: uppercase; }
+        .truck-meta { font-size: 0.9rem; color: var(--blue); font-weight: bold; }
+
+        /* LOADING ROW STYLE */
+        .scale-section { padding: 10px; background: #000; }
+        .scale-row { 
+            display: grid; 
+            grid-template-columns: 1.5fr 1fr 1fr; 
+            align-items: center; 
+            margin-bottom: 8px; 
+            border-bottom: 1px solid #222; 
+            padding-bottom: 8px; 
+        }
+        .scale-lbl { color: #888; font-size: 0.9rem; font-weight: bold; }
+        .scale-add { font-size: 1.3rem; font-weight: bold; color: #fff; text-align: right; }
+        .scale-val { font-size: 1.6rem; font-weight: 900; color: var(--neon); font-variant-numeric: tabular-nums; text-align: right; }
+        .lbl-tiny { font-size: 0.6rem; color: #555; display: block; text-align: right; margin-bottom: 2px;}
+
+        /* BALE ALERT (SEPARATE) */
+        .bale-sep-alert { background: var(--amber); color: #000; padding: 15px; font-weight: 900; text-align: center; border-bottom: 2px solid #333; font-size: 1.2rem; text-transform: uppercase; animation: pulse 2s infinite; }
+        
+        /* DROP TARGETS */
+        .drop-zone { background: #111; padding: 15px; border-top: 2px solid #333; }
+        .drop-item { background: #1a1a1a; padding: 12px; margin-bottom: 10px; border-radius: 6px; border-left: 4px solid var(--blue); }
+        .drop-math { display: flex; justify-content: space-between; align-items: flex-end; }
+        .stop-at { font-size: 1.8rem; font-weight: 900; color: var(--neon); line-height: 1; }
+        .stop-lbl { font-size: 0.7rem; color: #666; display: block; }
+
+        /* NAV */
+        .nav { position: fixed; bottom: 0; width: 100%; background: #111; border-top: 1px solid #333; display: flex; padding-bottom: env(safe-area-inset-bottom); }
+        .nav-btn { flex: 1; padding: 20px 0; text-align: center; color: #555; font-size: 0.8rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; }
+        .nav-btn.active { color: var(--neon); background: rgba(57, 255, 20, 0.05); border-top: 3px solid var(--neon); }
+
+        @keyframes pulse { 0% { opacity: 0.9; } 50% { opacity: 1; } 100% { opacity: 0.9; } }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Forage Command</h1>
+</div>
+
+<div id="view-setup" class="container">
+    <div class="card">
+        <div class="section-title">1. Ration Recipe (Lbs/Head)</div>
+        <div class="input-row">
+            <div><label>SILAGE</label><input type="number" id="rec-sil" oninput="save()" placeholder="0"></div>
+            <div><label>DISTILLERS</label><input type="number" id="rec-dist" oninput="save()" placeholder="0"></div>
+        </div>
+        
+        <div style="border-top:1px solid #333; margin-top:15px; padding-top:15px;">
+            <div class="section-title">Bale Settings</div>
+            <div class="input-row">
+                <div><label>AVG BALE WEIGHT (LBS)</label><input type="number" id="bale-wt" oninput="save()" placeholder="1200"></div>
+            </div>
+            
+            <label>BALE HANDLING</label>
+            <div class="mode-toggle">
+                <button class="m-btn active" id="btn-mix" onclick="setMode('mix')">IN MIXER</button>
+                <button class="m-btn" id="btn-sep" onclick="setMode('sep')">SEPARATE</button>
+            </div>
+            <div id="mode-msg" style="font-size:0.7rem; color:#666; margin-top:5px; text-align:center;">
+                *Operator adds Whole Bales. Scale target increases by Avg Weight.
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-title">2. Inventory</div>
+        <div class="input-row">
+            <div><label>Silage Stock (Tons)</label><input type="number" id="inv-sil" oninput="save()"></div>
+            <div><label>Bales Stock (Count)</label><input type="number" id="inv-bale" oninput="save()"></div>
+        </div>
+        <div style="text-align:center; padding-top:10px; border-top:1px solid #333;">
+            <div style="color:#888; font-size:0.7rem;">EST. SILAGE DAYS REMAINING</div>
+            <div id="days-left" style="font-size:2.5rem; color:var(--amber); font-weight:900;">--</div>
+        </div>
+    </div>
+</div>
+
+<div id="view-routes" class="container hidden">
+    <div id="routes-list"></div>
+    <button onclick="addRoute()" style="width:100%; padding:15px; background:#111; border:1px dashed #444; color:var(--blue); font-weight:bold; border-radius:8px;">+ NEW ROUTE</button>
+    <div style="height:60px;"></div>
+</div>
+
+<div id="view-card" class="container hidden">
+    <div id="feed-cards"></div>
+    <div style="height:60px;"></div>
+</div>
+
+<div class="nav">
+    <div class="nav-btn active" id="nav-1" onclick="go('setup')">Recipe</div>
+    <div class="nav-btn" id="nav-2" onclick="go('routes')">Routes</div>
+    <div class="nav-btn" id="nav-3" onclick="go('card')">FEED CARD</div>
+</div>
+
+<script>
+    let data = {
+        recipe: { sil: 0, dist: 0 },
+        bale: { weight: 1200, mode: 'mix' },
+        inv: { sil: 0, bale: 0 },
+        routes: [] 
+    };
+
+    window.onload = () => {
+        if(localStorage.getItem('fcBaleData')) data = JSON.parse(localStorage.getItem('fcBaleData'));
+        if(!data.routes.length) addRoute();
+        renderInputs();
+        renderRoutes();
+    };
+
+    function save() {
+        data.recipe.sil = parseFloat(document.getElementById('rec-sil').value) || 0;
+        data.recipe.dist = parseFloat(document.getElementById('rec-dist').value) || 0;
+        data.bale.weight = parseFloat(document.getElementById('bale-wt').value) || 0;
+        data.inv.sil = parseFloat(document.getElementById('inv-sil').value) || 0;
+        data.inv.bale = parseFloat(document.getElementById('inv-bale').value) || 0;
+        localStorage.setItem('fcBaleData', JSON.stringify(data));
+        calcDays();
+    }
+
+    function setMode(m) {
+        data.bale.mode = m;
+        document.getElementById('btn-mix').className = m === 'mix' ? 'm-btn active' : 'm-btn';
+        document.getElementById('btn-sep').className = m === 'sep' ? 'm-btn sep-active' : 'm-btn';
+        document.getElementById('mode-msg').innerText = m === 'mix' 
+            ? "*Bales added to Mixer. Scale Target increases." 
+            : "*Bales are SEPARATE (Yellow Band). Not in scale target.";
+        save();
+    }
+
+    function calcDays() {
+        let totalHead = 0;
+        data.routes.forEach(r => r.stops.forEach(s => totalHead += (parseFloat(s.head)||0)));
+        const dailyTons = (totalHead * data.recipe.sil) / 2000;
+        const days = dailyTons > 0 ? Math.floor(data.inv.sil / dailyTons) : 0;
+        document.getElementById('days-left').innerText = days > 0 ? days : "--";
+    }
+
+    function renderInputs() {
+        document.getElementById('rec-sil').value = data.recipe.sil || "";
+        document.getElementById('rec-dist').value = data.recipe.dist || "";
+        document.getElementById('bale-wt').value = data.bale.weight || "";
+        document.getElementById('inv-sil').value = data.inv.sil || "";
+        document.getElementById('inv-bale').value = data.inv.bale || "";
+        setMode(data.bale.mode);
+        calcDays();
+    }
+
+    // --- ROUTES ---
+    function addRoute() {
+        data.routes.push({ id: Date.now(), name: "", baleCount: 0, stops: [{name: "", head: ""}] });
+        save(); renderRoutes();
+    }
+
+    function updateRoute(id, key, val) {
+        let r = data.routes.find(x => x.id === id);
+        r[key] = val;
+        save();
+    }
+
+    function updateStop(rid, idx, key, val) {
+        let r = data.routes.find(x => x.id === rid);
+        r.stops[idx][key] = val;
+        if(idx === r.stops.length - 1 && val !== "") { r.stops.push({name:"", head:""}); renderRoutes(); }
+        save();
+    }
+
+    function renderRoutes() {
+        const div = document.getElementById('routes-list');
+        div.innerHTML = "";
+        data.routes.forEach((r, i) => {
+            let sHtml = "";
+            r.stops.forEach((s, j) => {
+                sHtml += `<div style="display:flex; gap:5px; margin-bottom:5px;">
+                    <input type="text" placeholder="Pen Name" value="${s.name}" oninput="updateStop(${r.id},${j},'name',this.value)">
+                    <input type="number" placeholder="#" style="width:70px;" value="${s.head}" oninput="updateStop(${r.id},${j},'head',this.value)">
+                </div>`;
+            });
+            
+            div.innerHTML += `
+            <div class="card">
+                <div style="border-left:3px solid var(--blue); padding-left:10px; margin-bottom:15px;">
+                    <input type="text" placeholder="Route Name (e.g. Heifers)" value="${r.name}" 
+                           oninput="updateRoute(${r.id}, 'name', this.value)"
+                           style="background:none; border:none; color:white; font-weight:bold; font-size:1.1rem; padding:0; width:100%;">
+                    
+                    <div style="display:flex; align-items:center; gap:10px; margin-top:10px;">
+                        <label style="margin:0; color:#fff;">BALES FOR THIS ROUTE:</label>
+                        <input type="number" value="${r.baleCount}" oninput="updateRoute(${r.id}, 'baleCount', this.value)" 
+                            style="width:80px; padding:8px; background:#222; border:1px solid #444;">
+                    </div>
+                </div>
+                ${sHtml}
+            </div>`;
+        });
+    }
+
+    // --- FEED CARD ---
+    function renderFeedCard() {
+        const div = document.getElementById('feed-cards');
+        div.innerHTML = "";
+        
+        data.routes.forEach(r => {
+            let validStops = r.stops.filter(s => s.head && s.head > 0);
+            if(!validStops.length) return;
+
+            let totalHead = 0;
+            validStops.forEach(s => totalHead += parseFloat(s.head));
+
+            // LOAD AMOUNTS
+            const loadSil = Math.round(totalHead * data.recipe.sil);
+            const loadDist = Math.round(totalHead * data.recipe.dist);
+            const bales = parseFloat(r.baleCount) || 0;
+            const baleWtTotal = bales * data.bale.weight;
+
+            // BALE ALERT (SEPARATE)
+            let baleAlert = "";
+            if(data.bale.mode === 'sep' && bales > 0) {
+                baleAlert = `<div class="bale-sep-alert">⚠️ LOAD ${bales} ROUND BALES SEPARATE</div>`;
+            }
+
+            // LOADING SCALES
+            let scaleAccum = 0;
+            let scaleHtml = "";
+
+            // 1. Silage
+            scaleAccum += loadSil;
+            scaleHtml += `<div class="scale-row">
+                <span class="scale-lbl">1. SILAGE</span>
+                <div><span class="lbl-tiny">ADD</span><div class="scale-add">${loadSil}</div></div>
+                <div><span class="lbl-tiny">SCALE TARGET</span><div class="scale-val">${scaleAccum}</div></div>
+            </div>`;
+
+            // 2. Distillers
+            scaleAccum += loadDist;
+            scaleHtml += `<div class="scale-row">
+                <span class="scale-lbl">2. DISTILLERS</span>
+                <div><span class="lbl-tiny">ADD</span><div class="scale-add">${loadDist}</div></div>
+                <div><span class="lbl-tiny">SCALE TARGET</span><div class="scale-val">${scaleAccum}</div></div>
+            </div>`;
+
+            // 3. Bales (IN MIXER)
+            if(data.bale.mode === 'mix' && bales > 0) {
+                scaleAccum += baleWtTotal;
+                scaleHtml += `<div class="scale-row">
+                    <span class="scale-lbl">3. BALES</span>
+                    <div><span class="lbl-tiny">ADD (COUNT)</span><div class="scale-add">${bales} <span style="font-size:0.8rem">BALES</span></div></div>
+                    <div><span class="lbl-tiny">SCALE TARGET</span><div class="scale-val">${Math.round(scaleAccum)}</div></div>
+                </div>`;
+            }
+
+            // TOTAL
+            scaleHtml += `<div style="background:#111; padding:8px; text-align:right; font-size:0.8rem; color:#888; border-top:1px solid #333;">
+                TOTAL MIXER WEIGHT: <span style="color:var(--blue); font-weight:bold; font-size:1rem;">${Math.round(scaleAccum)}</span>
+            </div>`;
+
+            // DROP TARGETS
+            let dropHtml = "";
+            let currentScale = scaleAccum;
+            // Ration Weight Per Head (Silage + Distillers + (BaleWeight/Head if Mixed))
+            let rationPerHead = data.recipe.sil + data.recipe.dist;
+            if(data.bale.mode === 'mix' && totalHead > 0) {
+                rationPerHead += (baleWtTotal / totalHead);
+            }
+
+            validStops.forEach(s => {
+                let head = parseFloat(s.head);
+                let dropAmt = Math.round(head * rationPerHead);
+                let stopAt = currentScale - dropAmt;
+
+                dropHtml += `<div class="drop-item">
+                    <div style="font-size:1.1rem; font-weight:bold; color:#fff;">${s.name} <span style="font-size:0.8rem; color:#666;">(${head} hd)</span></div>
+                    <div class="drop-math">
+                        <div><span class="stop-lbl">DROP AMT</span><div style="font-size:1.1rem; font-weight:bold;">${dropAmt}</div></div>
+                        <div style="text-align:right;"><span class="stop-lbl">SCALE STOP AT &rarr;</span><div class="stop-at">${Math.round(stopAt)}</div></div>
+                    </div>
+                </div>`;
+                currentScale = stopAt;
+            });
+
+            div.innerHTML += `
+            <div class="card truck-card">
+                ${baleAlert}
+                <div class="truck-head">
+                    <div class="truck-title">${r.name || 'Unnamed Route'}</div>
+                    <div class="truck-meta">${totalHead} HD</div>
+                </div>
+                <div class="scale-section">
+                    <div style="font-size:0.7rem; color:#666; margin-bottom:8px; font-weight:bold;">LOADING STEPS</div>
+                    ${scaleHtml}
+                </div>
+                <div class="drop-zone">
+                    <div style="font-size:0.7rem; color:#666; margin-bottom:8px; font-weight:bold;">DROP LIST (COUNTDOWN)</div>
+                    ${dropHtml}
+                </div>
+            </div>`;
+        });
+    }
+
+    function go(v) {
+        document.querySelectorAll('.container').forEach(e => e.classList.add('hidden'));
+        document.querySelectorAll('.nav-btn').forEach(e => e.classList.remove('active'));
+        if(v=='setup'){ document.getElementById('view-setup').classList.remove('hidden'); document.getElementById('nav-1').classList.add('active'); }
+        if(v=='routes'){ document.getElementById('view-routes').classList.remove('hidden'); document.getElementById('nav-2').classList.add('active'); renderRoutes(); }
+        if(v=='card'){ document.getElementById('view-card').classList.remove('hidden'); document.getElementById('nav-3').classList.add('active'); renderFeedCard(); }
+    }
+</script>
+</body>
+</html>
